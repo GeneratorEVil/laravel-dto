@@ -36,155 +36,96 @@ abstract class DTO
         $reflection = new ReflectionClass($this);
         $properties = $reflection->getProperties();
 
-        foreach ($data as $key => $value) {
-            $property = collect($properties)->filter(fn($property) => $key === $property->getName())->first();
-            $type = $property?->getType();
+        foreach ($data as $propertyName => $propertyValue) {
+            $property = collect($properties)->first(fn($property) => $property->getName() === $propertyName);
 
-            if ($type && property_exists($this, $key)) {
-                // Log::channel('test')->info($this::class . ': ' . $key . ' => ' . $type);
+            if (! $property) {
+                continue;
+            }
 
-                if ($type instanceof \ReflectionUnionType) {
+            $type = $property->getType();
+
+            if ($type) {
+                $typeName = $type->getName();
+
+                if ($type instanceof ReflectionUnionType) {
                     $types = $type->getTypes();
                     $isConverted = false;
+
                     foreach ($types as $type) {
                         try {
-                            $typeName = $type->getName();
+                            $this->{$propertyName} = $type->getName() === 'null'
+                                ? null
+                                : new $type->getName($propertyValue);
 
-                            if ($typeName === 'null') {
-                                if ($value === null) {
-                                    $this->{$key} = null;
-                                    $isConverted = true;
-
-                                    break;
-                                }
-
-                                continue; // Пропускаем, если значение не null
-                            }
-
-                            // Проверяем, что значение — массив, если тип — это класс
-                            if (! is_array($value)) {
-                                throw new Exception("Value for {$key} must be an array to cast to {$typeName}");
-                            }
-
-                            $this->{$key} = new $typeName($value);
                             $isConverted = true;
 
                             break;
-                        } catch (Exception $e) {
-                            // Log::channel('test')->error($e->getMessage());
+                        } catch (Throwable $e) {
                         }
                     }
 
                     if (! $isConverted) {
-                        throw new Exception('Cannot convert ' . $key . ' to one of ' . implode(', ', collect($types)->map(fn($type) => $type->getName())->toArray()));
+                        throw new Exception("Cannot convert {$propertyName} to one of " . implode(', ', collect($types)->map(fn($type) => $type->getName())->toArray()));
                     }
                 } else {
-                    $typeName = $type->getName();
-                    // Log::channel('test')->info($this::class . ': ' . $key . ' => ' . $typeName);
-
                     try {
-                        $rc = new \ReflectionEnum($typeName);
-
-                        if ($rc->isEnum()) {
-                            $this->{$key} = $typeName::from($value);
-
-                            continue;
-                        }
+                        $this->{$propertyName} = match ($typeName) {
+                            'string' => (string) $propertyValue,
+                            'int' => (int) $propertyValue,
+                            'bool' => (bool) $propertyValue,
+                            'array' => (array) $propertyValue,
+                            'float' => (float) $propertyValue,
+                            default => $this->handleEnumAndInstance($typeName, $propertyValue),
+                        };
                     } catch (Throwable $e) {
-                    }
-
-                    switch ($typeName) {
-                        case 'string':
-                            $this->{$key} = (string) $value;
-
-                            break;
-                        case 'int':
-                            $this->{$key} = (int) $value;
-
-                            break;
-                        case 'bool':
-                            $this->{$key} = (bool) $value;
-
-                            break;
-                        case 'array':
-                            $this->{$key} = (array) $value;
-
-                            break;
-                        case 'float':
-                            $this->{$key} = (float) $value;
-
-                            break;
-                    }
-
-                    if ($value instanceof $typeName) {
-                        $this->{$key} = $value;
-
-                        continue;
-                    }
-
-                    if (str_contains($type, '?') && is_null($value)) {
-                        $this->{$key} = null;
-
-                        continue;
+                        throw new Exception("Cannot convert {$propertyName} to {$typeName}");
                     }
                 }
-            }
-
-            if (! $type && property_exists($this, $key)) {
-                $this->{$key} = $value;
-
-                continue;
             }
 
             $casts = $this->casts();
 
-            if ($casts && array_key_exists($key, $casts)) {
-                $castConfig = $casts[$key];
-                $class = $castConfig[1];
-                $isCollection = $castConfig[0] === 'collection';
-                $isArray = $castConfig[0] === 'array';
+            if ($casts && array_key_exists($propertyName, $casts)) {
+                [$castType, $castClass] = $casts[$propertyName];
+                $isCollection = $castType === 'collection';
+                $isArray = $castType === 'array';
 
-                // Если значение null, присваиваем null и пропускаем
-                if (is_null($value)) {
-                    $this->{$key} = null;
+                if (is_null($propertyValue)) {
+                    $this->{$propertyName} = null;
 
                     continue;
                 }
 
-                // Проверяем, что значение — массив, если требуется коллекция или массив
-                if (($isCollection || $isArray) && ! is_array($value)) {
-                    throw new Exception("Value for {$key} must be an array to cast to " . ($isCollection ? 'collection' : 'array') . " of {$class}");
+                if (($isCollection || $isArray) && ! is_array($propertyValue)) {
+                    throw new Exception("Value for {$propertyName} must be an array to cast to " . ($isCollection ? 'collection' : 'array') . " of {$castClass}");
                 }
 
-                // Обработка коллекции
-                if ($isCollection) {
-                    $this->{$key} = count($value) > 0
-                        ? collect($value)->map(fn($item) => ($item instanceof $class) ? $item : new $class($item))
-                        : collect();
-
-                    continue;
-                }
-
-                // Обработка массива
-                if ($isArray) {
-                    $this->{$key} = count($value) > 0
-                        ? array_map(fn($item) => ($item instanceof $class) ? $item : new $class($item), $value)
-                        : [];
-
-                    continue;
-                }
-
-                // Обработка одиночного объекта
-                if (! ($value instanceof $class)) {
-                    if (! is_array($value)) {
-                        throw new Exception("Value for {$key} must be an array to cast to {$class}");
-                    }
-                    $this->{$key} = new $class($value);
-                } else {
-                    $this->{$key} = $value; // Если уже экземпляр класса, просто присваиваем
-                }
+                $this->{$propertyName} = match ($castType) {
+                    'collection' => count($propertyValue) > 0
+                        ? collect($propertyValue)->map(fn($item) => ($item instanceof $castClass) ? $item : new $castClass($item))
+                        : collect(),
+                    'array' => count($propertyValue) > 0
+                        ? array_map(fn($item) => ($item instanceof $castClass) ? $item : new $castClass($item), $propertyValue)
+                        : [],
+                    default => new $castClass($propertyValue),
+                };
             }
         }
+    }
+
+    private function handleEnumAndInstance(string $typeName, $propertyValue)
+    {
+        if (is_subclass_of($typeName, \UnitEnum::class)) {
+            foreach ($typeName::cases() as $enumCase) {
+                if ($enumCase->value === $propertyValue) {
+                    return $enumCase;
+                }
+            }
+            throw new Exception("Invalid enum value for type {$typeName}");
+        }
+
+        return $propertyValue instanceof $typeName ? $propertyValue : new $typeName($propertyValue);
     }
 
     protected function validate(array $data): void
