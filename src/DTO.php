@@ -116,7 +116,7 @@ abstract class DTO
 
     private function handleEnumAndInstance(string $typeName, $propertyValue)
     {
-        if (is_subclass_of($typeName, \UnitEnum::class)) {
+        if (is_subclass_of($typeName, \UnitEnum::class) && ! $propertyValue instanceof $typeName) {
             foreach ($typeName::cases() as $enumCase) {
                 if ($enumCase->value === $propertyValue) {
                     return $enumCase;
