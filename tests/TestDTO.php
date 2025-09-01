@@ -19,6 +19,8 @@ class TestDTO extends DTO
 
     public ?Collection $collectionTestDTOs;
 
+    public $noType;
+
     protected function casts(): array
     {
         return [

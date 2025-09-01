@@ -82,6 +82,8 @@ abstract class DTO
                         throw new Exception("Cannot convert {$propertyName} to {$typeName}");
                     }
                 }
+            } else {
+                $this->{$propertyName} = $propertyValue;
             }
 
             $casts = $this->casts();

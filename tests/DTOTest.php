@@ -77,6 +77,7 @@ class DTOTest extends TestCase
                     ],
                 ],
             ],
+            'noType' => 'test'
         ];
 
         $this->checkData = [
@@ -109,6 +110,7 @@ class DTOTest extends TestCase
                     ],
                 ],
             ]),
+            'noType' => 'test'
         ];
     }
     public function testConstruct()
