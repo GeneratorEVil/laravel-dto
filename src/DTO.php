@@ -3,11 +3,11 @@
 namespace Betstore\DTO;
 
 use Exception;
-use Illuminate\Support\Facades\Validator;
-use ReflectionClass;
 use Throwable;
+use ReflectionClass;
+use Illuminate\Contracts\Support\Responsable;
 
-abstract class DTO
+abstract class DTO implements Responsable
 {
     protected function rules(): array
     {
@@ -179,5 +179,9 @@ abstract class DTO
     public function toJson(int $options = 0): string
     {
         return json_encode($this->toArray(), $options);
+    }
+
+    public function toResponse($status=200){
+        return response()->json($this->toArray(), $status);
     }
 }
