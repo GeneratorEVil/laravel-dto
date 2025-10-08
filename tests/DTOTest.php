@@ -142,4 +142,11 @@ class DTOTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new TestDTO('invalid data');
     }
+
+    public function testToResponse()
+    {
+        $dto = new TestDTO($this->data);
+        $response = $dto->toResponse();
+        $this->assertInstanceOf(\Illuminate\Http\JsonResponse::class, $response);
+    }
 }
