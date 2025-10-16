@@ -6,6 +6,7 @@ use Exception;
 use Throwable;
 use ReflectionClass;
 use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Support\Facades\Validator;
 
 abstract class DTO implements Responsable
 {
