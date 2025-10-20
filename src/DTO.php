@@ -182,7 +182,7 @@ abstract class DTO implements Responsable
         return json_encode($this->toArray(), $options);
     }
 
-    public function toResponse($status = 200)
+    public function toResponse($request, int $status = 200)
     {
         return response()->json($this->toArray(), $status);
     }
