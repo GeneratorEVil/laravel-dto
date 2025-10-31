@@ -147,16 +147,18 @@ abstract class DTO implements Responsable
         return new static($data);
     }
 
-    public function fromModel(Model $model)
+    public static function fromModel(Model $model)
     {
+        $dto = new static();
+
         foreach ($model->getAttributes() as $key => $value) {
             $camelCaseKey = Str::camel($key);
-            if (isset($this->{$camelCaseKey})) {
-                $this->{$camelCaseKey} = $value;
+            if (isset($dto->{$camelCaseKey})) {
+                $dto->{$camelCaseKey} = $value;
             }
         }
 
-        return $this;
+        return $dto;
     }
 
     public function toArray(bool $unsetNulls = false): array
