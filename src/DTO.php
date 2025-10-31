@@ -5,8 +5,10 @@ namespace Betstore\DTO;
 use Exception;
 use Throwable;
 use ReflectionClass;
-use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Contracts\Support\Responsable;
 
 abstract class DTO implements Responsable
 {
@@ -143,6 +145,16 @@ abstract class DTO implements Responsable
     public static function fromArray(array $data)
     {
         return new static($data);
+    }
+
+    public function fromModel(Model $model)
+    {
+        foreach ($model->getAttributes() as $key => $value) {
+            $camelCaseKey = Str::camel($key);
+            $this->{$camelCaseKey} = $value;
+        }
+
+        return $this;
     }
 
     public function toArray(bool $unsetNulls = false): array
