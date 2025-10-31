@@ -151,7 +151,9 @@ abstract class DTO implements Responsable
     {
         foreach ($model->getAttributes() as $key => $value) {
             $camelCaseKey = Str::camel($key);
-            $this->{$camelCaseKey} = $value;
+            if (isset($this->{$camelCaseKey})) {
+                $this->{$camelCaseKey} = $value;
+            }
         }
 
         return $this;
