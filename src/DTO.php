@@ -154,7 +154,7 @@ abstract class DTO implements Responsable
         foreach ($model->getAttributes() as $key => $value) {
             $camelCaseKey = Str::camel($key);
             if (property_exists($dto, $camelCaseKey)) {
-                $dto->{$camelCaseKey} = $value;
+                $dto->{$camelCaseKey} = $model->{$key};
             }
         }
 
