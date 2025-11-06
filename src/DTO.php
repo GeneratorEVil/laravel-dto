@@ -8,9 +8,11 @@ use ReflectionClass;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Contracts\Support\Jsonable;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Responsable;
 
-abstract class DTO implements Responsable
+abstract class DTO implements Responsable, Jsonable, Arrayable
 {
     protected function rules(): array
     {
@@ -193,7 +195,7 @@ abstract class DTO implements Responsable
         return $data;
     }
 
-    public function toJson(int $options = 0): string
+    public function toJson($options = 0)
     {
         return json_encode($this->toArray(), $options);
     }
