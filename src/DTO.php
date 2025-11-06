@@ -151,16 +151,16 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
     public static function fromModel(Model $model)
     {
+        $array = [];
         $dto = new static();
-
         foreach ($model->getAttributes() as $key => $value) {
             $camelCaseKey = Str::camel($key);
             if (property_exists($dto, $camelCaseKey)) {
-                $dto->{$camelCaseKey} = $model->{$key};
+                $array[$camelCaseKey] = $model->{$key};
             }
         }
 
-        return $dto;
+        return new static($array);
     }
 
     public function toArray(bool $unsetNulls = false): array
