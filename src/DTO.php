@@ -51,22 +51,17 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
             $type = $property->getType();
 
             if ($type) {
-                $typeName = $type->getName();
-
-                if ($type instanceof ReflectionUnionType) {
+                if ($type instanceof \ReflectionUnionType) {
                     $types = $type->getTypes();
                     $isConverted = false;
 
                     foreach ($types as $type) {
                         try {
-                            $this->{$propertyName} = $type->getName() === 'null'
-                                ? null
-                                : new $type->getName($propertyValue);
-
+                            $this->typecasting($type, $propertyName, $propertyValue);
                             $isConverted = true;
-
                             break;
                         } catch (Throwable $e) {
+                            $isConverted = false;
                         }
                     }
 
@@ -74,18 +69,7 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
                         throw new Exception("Cannot convert {$propertyName} to one of " . implode(', ', collect($types)->map(fn($type) => $type->getName())->toArray()));
                     }
                 } else {
-                    try {
-                        $this->{$propertyName} = match ($typeName) {
-                            'string' => (string) $propertyValue,
-                            'int' => (int) $propertyValue,
-                            'bool' => (bool) $propertyValue,
-                            'array' => (array) $propertyValue,
-                            'float' => (float) $propertyValue,
-                            default => $this->handleEnumAndInstance($typeName, $propertyValue),
-                        };
-                    } catch (Throwable $e) {
-                        throw new Exception("Cannot convert {$propertyName} to {$typeName}");
-                    }
+                    $this->typecasting($type, $propertyName, $propertyValue);
                 }
             } else {
                 $this->{$propertyName} = $propertyValue;
@@ -121,6 +105,23 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
         }
     }
 
+
+    private function typecasting($type, $propertyName, $propertyValue)
+    {
+        $typeName = $type->getName();
+        try {
+            $this->{$propertyName} = match ($typeName) {
+                'string' => (string) $propertyValue,
+                'int' => (int) $propertyValue,
+                'bool' => (bool) $propertyValue,
+                'array' => (array) $propertyValue,
+                'float' => (float) $propertyValue,
+                default => $this->handleEnumAndInstance($typeName, $propertyValue),
+            };
+        } catch (Throwable $e) {
+            throw new Exception("Cannot convert {$propertyName} to {$typeName}");
+        }
+    }
     private function handleEnumAndInstance(string $typeName, $propertyValue)
     {
         if (is_subclass_of($typeName, \UnitEnum::class) && ! $propertyValue instanceof $typeName) {
