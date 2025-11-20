@@ -57,7 +57,11 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
                     foreach ($types as $type) {
                         try {
-                            if (gettype($propertyValue) !== $type->getName()) {
+                            $propertyTypeName  = $type->getName();
+                            if (
+                                gettype($propertyValue) !== $propertyTypeName  &&
+                                ! $propertyValue instanceof $propertyTypeName
+                            ) {
                                 continue;
                             }
                             $this->typecasting($type, $propertyName, $propertyValue);
