@@ -116,13 +116,15 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
     private function typecasting($type, $propertyName, $propertyValue)
     {
         $typeName = $type->getName();
+        $allowNull = $type->allowsNull();
+
         try {
             $this->{$propertyName} = match ($typeName) {
-                'string' => (string) $propertyValue,
-                'int' => (int) $propertyValue,
-                'bool' => (bool) $propertyValue,
-                'array' => (array) $propertyValue,
-                'float' => (float) $propertyValue,
+                'string' => $allowNull && is_null($propertyValue) ? null : (string) $propertyValue,
+                'int' => $allowNull && is_null($propertyValue) ? null : (int) $propertyValue,
+                'bool' => $allowNull && is_null($propertyValue) ? null : (bool) $propertyValue,
+                'array' => $allowNull && is_null($propertyValue) ? null : (array) $propertyValue,
+                'float' => $allowNull && is_null($propertyValue) ? null : (float) $propertyValue,
                 default => $this->handleEnumAndInstance($typeName, $propertyValue),
             };
         } catch (Throwable $e) {
