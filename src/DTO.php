@@ -106,7 +106,7 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
                     'array' => count($propertyValue) > 0
                         ? array_map(fn($item) => ($item instanceof $castClass) ? $item : new $castClass($item), $propertyValue)
                         : [],
-                    default => new $castClass($propertyValue),
+                    default => $this->handleEnumAndInstance($castClass, $propertyValue),
                 };
             }
         }
