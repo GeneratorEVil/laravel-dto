@@ -24,6 +24,11 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
      */
     private static array $propertiesCache = [];
 
+    /**
+     * Кэш для валидационных правил по классам
+     */
+    private static array $validationCache = [];
+
     protected function rules(): array
     {
         return [];
@@ -147,16 +152,18 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
             $unionTypeName = $unionType->getName();
 
             // Нормализуем типы для сравнения
-            $normalizedType = match($unionTypeName) {
+            $normalizedType = match ($unionTypeName) {
                 'int' => 'integer',
                 'bool' => 'boolean',
                 'float' => 'double',
                 default => $unionTypeName
             };
 
-            if ($valueType === $normalizedType ||
+            if (
+                $valueType === $normalizedType ||
                 ($propertyValue instanceof $unionTypeName) ||
-                (is_object($propertyValue) && is_subclass_of($propertyValue, $unionTypeName))) {
+                (is_object($propertyValue) && is_subclass_of($propertyValue, $unionTypeName))
+            ) {
                 $this->{$propertyName} = $propertyValue;
                 return;
             }
@@ -210,16 +217,19 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
     protected function validate(array $data): void
     {
-        static $cachedRules = null;
-        static $cachedMessages = null;
+        $className = static::class;
 
-        if ($cachedRules === null) {
-            $cachedRules = $this->rules();
-            $cachedMessages = $this->messages();
+        if (!isset(self::$validationCache[$className])) {
+            self::$validationCache[$className] = [
+                'rules' => $this->rules(),
+                'messages' => $this->messages(),
+            ];
         }
 
-        if ($cachedRules && count($data) > 0) {
-            Validator::make($data, $cachedRules, $cachedMessages)->validate();
+        $cachedData = self::$validationCache[$className];
+
+        if ($cachedData['rules'] && count($data) > 0) {
+            Validator::make($data, $cachedData['rules'], $cachedData['messages'])->validate();
         }
     }
 
