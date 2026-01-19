@@ -14,6 +14,16 @@ use Illuminate\Contracts\Support\Responsable;
 
 abstract class DTO implements Responsable, Jsonable, Arrayable
 {
+    /**
+     * Кэш для reflection данных по классам
+     */
+    private static array $reflectionCache = [];
+
+    /**
+     * Кэш для свойств класса
+     */
+    private static array $propertiesCache = [];
+
     protected function rules(): array
     {
         return [];
@@ -34,47 +44,50 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
         return [];
     }
 
+    /**
+     * Получить кэшированные данные reflection для класса
+     */
+    private static function getReflectionData(string $className): array
+    {
+        if (!isset(self::$reflectionCache[$className])) {
+            $reflection = new ReflectionClass($className);
+            $properties = $reflection->getProperties();
+
+            // Создаем хэш-мапу свойств для быстрого поиска
+            $propertiesMap = [];
+            foreach ($properties as $property) {
+                $propertiesMap[$property->getName()] = $property;
+            }
+
+            self::$reflectionCache[$className] = [
+                'reflection' => $reflection,
+                'properties' => $properties,
+                'propertiesMap' => $propertiesMap,
+            ];
+        }
+
+        return self::$reflectionCache[$className];
+    }
+
     public function __construct(array $data = [])
     {
         $this->validate($data);
 
-        $reflection = new ReflectionClass($this);
-        $properties = $reflection->getProperties();
+        $reflectionData = self::getReflectionData(static::class);
+        $propertiesMap = $reflectionData['propertiesMap'];
 
         foreach ($data as $propertyName => $propertyValue) {
-            $property = collect($properties)->first(fn($property) => $property->getName() === $propertyName);
-
-            if (! $property) {
+            if (!isset($propertiesMap[$propertyName])) {
                 continue;
             }
+
+            $property = $propertiesMap[$propertyName];
 
             $type = $property->getType();
 
             if ($type) {
                 if ($type instanceof \ReflectionUnionType) {
-                    $types = $type->getTypes();
-                    $isConverted = false;
-
-                    foreach ($types as $type) {
-                        try {
-                            $propertyTypeName  = $type->getName();
-                            if (
-                                gettype($propertyValue) !== $propertyTypeName  &&
-                                ! $propertyValue instanceof $propertyTypeName
-                            ) {
-                                continue;
-                            }
-                            $this->typecasting($type, $propertyName, $propertyValue);
-                            $isConverted = true;
-                            break;
-                        } catch (Throwable $e) {
-                            $isConverted = false;
-                        }
-                    }
-
-                    if (! $isConverted) {
-                        throw new Exception("Cannot convert {$propertyName} to one of " . implode(', ', collect($types)->map(fn($type) => $type->getName())->toArray()));
-                    }
+                    $this->handleUnionType($type, $propertyName, $propertyValue);
                 } else {
                     $this->typecasting($type, $propertyName, $propertyValue);
                 }
@@ -113,6 +126,56 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
     }
 
 
+    private function handleUnionType(\ReflectionUnionType $type, string $propertyName, $propertyValue): void
+    {
+        $types = $type->getTypes();
+        $valueType = gettype($propertyValue);
+
+        // Быстрая проверка для null
+        if ($propertyValue === null) {
+            foreach ($types as $unionType) {
+                if ($unionType->allowsNull()) {
+                    $this->{$propertyName} = null;
+                    return;
+                }
+            }
+            throw new Exception("Cannot assign null to non-nullable union type {$propertyName}");
+        }
+
+        // Быстрая проверка соответствия типов
+        foreach ($types as $unionType) {
+            $unionTypeName = $unionType->getName();
+
+            // Нормализуем типы для сравнения
+            $normalizedType = match($unionTypeName) {
+                'int' => 'integer',
+                'bool' => 'boolean',
+                'float' => 'double',
+                default => $unionTypeName
+            };
+
+            if ($valueType === $normalizedType ||
+                ($propertyValue instanceof $unionTypeName) ||
+                (is_object($propertyValue) && is_subclass_of($propertyValue, $unionTypeName))) {
+                $this->{$propertyName} = $propertyValue;
+                return;
+            }
+        }
+
+        // Если не подошло как есть, пытаемся конвертировать
+        foreach ($types as $unionType) {
+            try {
+                $this->typecasting($unionType, $propertyName, $propertyValue);
+                return;
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        $typeNames = array_map(fn($t) => $t->getName(), $types);
+        throw new Exception("Cannot convert {$propertyName} to one of " . implode(', ', $typeNames));
+    }
+
     private function typecasting($type, $propertyName, $propertyValue)
     {
         $typeName = $type->getName();
@@ -147,10 +210,16 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
     protected function validate(array $data): void
     {
-        $rules = $this->rules();
+        static $cachedRules = null;
+        static $cachedMessages = null;
 
-        if ($rules && count($data) > 0) {
-            Validator::make($data, $rules, $this->messages())->validate();
+        if ($cachedRules === null) {
+            $cachedRules = $this->rules();
+            $cachedMessages = $this->messages();
+        }
+
+        if ($cachedRules && count($data) > 0) {
+            Validator::make($data, $cachedRules, $cachedMessages)->validate();
         }
     }
 
@@ -175,11 +244,12 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
     public function toArray(bool $unsetNulls = false): array
     {
-        $reflection = new \ReflectionClass($this);
+        $reflectionData = self::getReflectionData(static::class);
+        $properties = $reflectionData['properties'];
         $data = [];
 
         // Собираем все свойства, включая унаследованные
-        foreach ($reflection->getProperties() as $property) {
+        foreach ($properties as $property) {
             $property->setAccessible(true); // Делаем свойство доступным, если оно protected или private
             // Проверяем, инициализировано ли свойство
             $value = $property->isInitialized($this) ? $property->getValue($this) : null;
