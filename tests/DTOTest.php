@@ -148,4 +148,15 @@ class DTOTest extends TestCase
         // Пропускаем тест toResponse так как функция response() не доступна в тестовой среде
         $this->markTestSkipped('toResponse test skipped - response() function not available in test environment');
     }
+
+    public function testNullCreatedAt()
+    {
+        $data = [
+            'name' => 'John',
+            'age' => 30,
+            'createdAt' => null,
+        ];
+        $dto = new TestDTO($data);
+        $this->assertNull($dto->createdAt);
+    }
 }

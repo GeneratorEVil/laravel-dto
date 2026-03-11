@@ -4,6 +4,7 @@ namespace Betstore\DTO\Tests;
 
 
 use Betstore\DTO\DTO;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class TestDTO extends DTO
@@ -16,6 +17,8 @@ class TestDTO extends DTO
     public ?TestEnum $enum;
 
     public array $arrayTestDTOs;
+
+    public ?Carbon $createdAt;
 
     public ?Collection $collectionTestDTOs;
 

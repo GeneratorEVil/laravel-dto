@@ -81,6 +81,8 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
         $reflectionData = self::getReflectionData(static::class);
         $propertiesMap = $reflectionData['propertiesMap'];
 
+        $casts = $this->casts();
+
         foreach ($data as $propertyName => $propertyValue) {
             if (!isset($propertiesMap[$propertyName])) {
                 continue;
@@ -89,18 +91,6 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
             $property = $propertiesMap[$propertyName];
 
             $type = $property->getType();
-
-            if ($type) {
-                if ($type instanceof \ReflectionUnionType) {
-                    $this->handleUnionType($type, $propertyName, $propertyValue);
-                } else {
-                    $this->typecasting($type, $propertyName, $propertyValue);
-                }
-            } else {
-                $this->{$propertyName} = $propertyValue;
-            }
-
-            $casts = $this->casts();
 
             if ($casts && array_key_exists($propertyName, $casts)) {
                 [$castType, $castClass] = $casts[$propertyName];
@@ -126,6 +116,14 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
                         : [],
                     default => $this->handleEnumAndInstance($castClass, $propertyValue),
                 };
+            } elseif ($type) {
+                if ($type instanceof \ReflectionUnionType) {
+                    $this->handleUnionType($type, $propertyName, $propertyValue);
+                } else {
+                    $this->typecasting($type, $propertyName, $propertyValue);
+                }
+            } else {
+                $this->{$propertyName} = $propertyValue;
             }
         }
     }
@@ -188,13 +186,19 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
         $typeName = $type->getName();
         $allowNull = $type->allowsNull();
 
+        // Handle null for nullable types
+        if (is_null($propertyValue) && $allowNull) {
+            $this->{$propertyName} = null;
+            return;
+        }
+
         try {
             $this->{$propertyName} = match ($typeName) {
-                'string' => $allowNull && is_null($propertyValue) ? null : (string) $propertyValue,
-                'int' => $allowNull && is_null($propertyValue) ? null : (int) $propertyValue,
-                'bool' => $allowNull && is_null($propertyValue) ? null : (bool) $propertyValue,
-                'array' => $allowNull && is_null($propertyValue) ? null : (array) $propertyValue,
-                'float' => $allowNull && is_null($propertyValue) ? null : (float) $propertyValue,
+                'string' => (string) $propertyValue,
+                'int' => (int) $propertyValue,
+                'bool' => (bool) $propertyValue,
+                'array' => (array) $propertyValue,
+                'float' => (float) $propertyValue,
                 default => $this->handleEnumAndInstance($typeName, $propertyValue),
             };
         } catch (Throwable $e) {
