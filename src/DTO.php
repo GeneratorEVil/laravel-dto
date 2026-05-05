@@ -232,7 +232,7 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
         $cachedData = self::$validationCache[$className];
 
-        if ($cachedData['rules']) {
+        if ($cachedData['rules'] && count($data) > 0) {
             Validator::make($data, $cachedData['rules'], $cachedData['messages'])->validate();
         }
     }
