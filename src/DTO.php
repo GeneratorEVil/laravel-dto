@@ -76,8 +76,7 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
 
     public function __construct(array $data = [])
     {
-        $this->validate($data);
-
+        
         $reflectionData = self::getReflectionData(static::class);
         $propertiesMap = $reflectionData['propertiesMap'];
 
@@ -125,6 +124,8 @@ abstract class DTO implements Responsable, Jsonable, Arrayable
             } else {
                 $this->{$propertyName} = $propertyValue;
             }
+
+            $this->validate($data);
         }
     }
 
